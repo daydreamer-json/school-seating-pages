@@ -1,0 +1,102 @@
+:root {
+  --bs-body-bg: var(--mdui-color-background);
+  --user-font-main: Inter, 'Noto Sans JP', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Ubuntu,
+    'Open Sans', 'Helvetica Neue', sans-serif;
+  --user-font-mono: 'Iosevka Web', 'SF Mono', 'Noto Sans JP', 'Noto Sans SC', SFMono-Regular, Menlo, Monaco, Consolas,
+    'Liberation Mono', 'Courier New', monospace, sans-serif, system-ui;
+}
+html,
+body {
+  font-family: var(--user-font-main);
+  font-feature-settings: 'liga' 1, 'calt' 1;
+}
+
+.font-monospace {
+  font-family: var(--user-font-mono) !important;
+}
+
+pre,
+code,
+kbd,
+samp,
+tt {
+  /* font-family: 'JetBrains Mono', 'SF Mono', 'Noto Sans JP', 'Noto Sans SC', SFMono-Regular, Menlo, Monaco, Consolas,
+    'Liberation Mono', 'Courier New', monospace, sans-serif, system-ui; */
+  font-family: var(--user-font-mono);
+}
+
+.user-drag-none {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+.lazy-thumbnail-charas {
+  width: 100%;
+  height: calc(100% * 48 / 42.9375); /* 229px→256pxに拡大 */
+  object-fit: fill;
+  position: absolute;
+  top: calc(-5.0625px * 48 / 42.9375); /* -27px */
+  left: 0;
+}
+
+.lazy-thumbnail-lives {
+  max-width: 80px;
+  cursor: pointer;
+}
+
+#seatingChartWrapper {
+  /* min-width: 1080px; */
+  overflow-x: auto;
+}
+#seatingChartHandmade {
+  min-width: 1080px;
+}
+
+.dtfc-top-blocker {
+  background-color: rgba(0, 0, 0, 0) !important;
+}
+
+.seat-cell-border {
+  --bs-border-opacity: 1;
+  border: var(--bs-border-width) var(--bs-border-style) var(--bs-border-color);
+  border-color: rgba(var(--bs-secondary-rgb), var(--bs-border-opacity));
+  border-width: 3px !important;
+}
+
+.seat-cell-border[data-seat-assigned='false'] {
+  --bs-border-opacity: 0.25 !important;
+}
+
+.seat-cell-border-blink {
+  animation: fadeBlink 0.6s ease 5 !important;
+}
+
+@keyframes fadeBlink {
+  0% {
+    border-color: rgba(var(--bs-secondary-rgb), var(--bs-border-opacity)) !important;
+  }
+  50% {
+    border-color: rgba(var(--bs-warning-rgb), var(--bs-border-opacity)) !important;
+  }
+  100% {
+    border-color: rgba(var(--bs-secondary-rgb), var(--bs-border-opacity)) !important;
+  }
+}
+
+#shuffleStepButton,
+#shuffleButton {
+  height: 6rem;
+}
+
+.spinner-border-large {
+  height: 3rem;
+  width: 3rem;
+}
+
+/* ---------------------- */
+
+#error-message {
+  margin-top: 15px;
+}

@@ -1,0 +1,10 @@
+CLASS_NUMBER: # Grade and class number
+  grade: 1
+  class: 1
+CLASS_I18N: # Grade and class suffix for display
+  grade: '-'
+  class: ''
+DEFAULT_SHUFFLE_CONFIG: # Animation setting for ShuffleStep execution
+  initialDelay: 30
+  maxDelay: 300
+  totalIterations: 35

@@ -1,0 +1,348 @@
+// import * as mdui from 'https://cdn.jsdelivr.net/npm/mdui@2/mdui.esm.js';
+// import ky from 'https://cdn.jsdelivr.net/npm/ky@1/+esm';
+// import { DateTime } from 'https://cdn.jsdelivr.net/npm/luxon@3/+esm';
+import YAML from 'https://cdn.jsdelivr.net/npm/yaml@2.8.0/+esm';
+import configDbFunc from './database.js';
+
+let configDb = null;
+
+// mdui.setColorScheme('#0d6efd', document.querySelector('#mainContainer'));
+function updateTheme() {
+  var isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  document.documentElement.setAttribute('data-bs-theme', isDarkMode ? 'dark' : 'light');
+}
+window.addEventListener('DOMContentLoaded', updateTheme);
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', updateTheme);
+
+let temporalState = {
+  shuffledStudents: null,
+  currentMemberIndex: 0,
+};
+
+/**
+ * 配列をセキュアな乱数を使ってシャッフルする (Fisher-Yates algorithm)
+ * @param array シャッフルする配列
+ * @returns シャッフルされた新しい配列
+ */
+function secureShuffle(array) {
+  const newArray = [...array];
+  const randomValues = new Uint32Array(newArray.length);
+  window.crypto.getRandomValues(randomValues);
+  for (let i = newArray.length - 1; i > 0; i--) {
+    // 0 から i までの範囲の乱数を生成
+    const j = randomValues[i] % (i + 1);
+    [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+  }
+  return newArray;
+}
+
+/**
+ * 利用可能な座席数を計算する
+ * @param layout 座席のレイアウト
+ * @returns 利用可能な座席数
+ */
+function countAvailableSeats(layout) {
+  let count = 0;
+  for (const row of layout) {
+    for (const seat of row) {
+      if (seat === 1) {
+        count++;
+      }
+    }
+  }
+  return count;
+}
+
+/**
+ * 座席表を描画する
+ * @param currentSeatLayout 割り当て前の座席レイアウト (表示用)
+ * @param assignedStudents 割り当てられた生徒の情報 (オプショナル)
+ */
+function renderSeatingChartV2(currentSeatLayout, assignedStudents) {
+  // console.log(currentSeatLayout);
+  // console.log(assignedStudents);
+  const seatingChartDiv = document.getElementById('seatingChartHandmade');
+  seatingChartDiv.innerHTML = ''; // 既存の座席表をクリア
+  seatingChartDiv.insertAdjacentHTML(
+    'beforeend',
+    (() => {
+      const availableSeatCoordinates = [];
+      currentSeatLayout.forEach((row, rowIndex) => {
+        row.forEach((seat, colIndex) => {
+          if (seat === 1) {
+            availableSeatCoordinates.push({ row: rowIndex, col: colIndex });
+          }
+        });
+      });
+      const retHtmlStrArray = [];
+      currentSeatLayout.forEach((rowArray, rowIndex) => {
+        if (rowArray.includes(1)) {
+          retHtmlStrArray.push(
+            `<div class="row py-1">${(() => {
+              const retHtmlStrArray2 = [];
+              rowArray.forEach((seatStatus, colIndex) => {
+                if (seatStatus) {
+                  const currentSeatOrderIndex = availableSeatCoordinates.findIndex(
+                    (coord) => coord.row === rowIndex && coord.col === colIndex,
+                  );
+                  const currentSeatCoord = availableSeatCoordinates[currentSeatOrderIndex];
+                  if (assignedStudents) {
+                    if (currentSeatOrderIndex !== -1 && currentSeatOrderIndex < assignedStudents.length) {
+                      const student = assignedStudents[currentSeatOrderIndex];
+                      retHtmlStrArray2.push(
+                        `<div class="col-2 px-1"><div class="d-flex flex-column seat-cell-border" data-seat-row="${currentSeatCoord.row}" data-seat-col="${currentSeatCoord.col}" data-seat-assigned="true"><span>${student.id}</span><span class="fs-5 fw-bold">${student.name}</span><span class="text-secondary">${student.ruby}</span></div></div>`,
+                      );
+                    }
+                  } else {
+                    retHtmlStrArray2.push(
+                      `<div class="col-2 px-1"><div class="d-flex flex-column seat-cell-border" data-seat-row="${currentSeatCoord.row}" data-seat-col="${currentSeatCoord.col}" data-seat-assigned="false"><span>&nbsp;</span><span class="fs-5 fw-bold">&nbsp;</span><span class="text-secondary">&nbsp;</span></div></div>`,
+                    );
+                  }
+                } else {
+                  retHtmlStrArray2.push(`<div class="col-2 px-1"></div>`);
+                }
+              });
+              return retHtmlStrArray2.join('');
+            })()}</div>`,
+          );
+        }
+      });
+      retHtmlStrArray.push(
+        `<div class="row py-1"><div class="col-4 px-1"></div><div class="col-4 px-1"><div class="d-flex flex-column seat-cell-border"><span class="fs-5 fw-bold">${configDb.CLASS_NUMBER.grade}${configDb.CLASS_I18N.grade}${configDb.CLASS_NUMBER.class}${configDb.CLASS_I18N.class}</span></div></div><div class="col-4 px-1"></div></div>`,
+      );
+      return retHtmlStrArray.join('');
+    })(),
+  );
+  document.getElementById('exportImageButton').disabled = !Boolean(assignedStudents);
+  document.getElementById('exportJsonButton').disabled = !Boolean(assignedStudents);
+}
+
+/**
+ * メインの席替え処理
+ */
+function performShuffle() {
+  const topStatusMessageSpan = [...document.querySelectorAll('#topStatusMessage p span')];
+
+  topStatusMessageSpan.forEach((el) => (el.textContent = '\u00A0'));
+
+  document.getElementById('errorMessage').classList.add('d-none'); // エラーメッセージを隠す
+  const numberOfStudents = configDb.MEMBER_LIST.length;
+  const numberOfAvailableSeats = countAvailableSeats(configDb.SEAT_POSITION_MATRIX);
+  if (numberOfStudents !== numberOfAvailableSeats) {
+    document.getElementById(
+      'errorMessage',
+    ).innerHTML = `Error: The number of students does not match the number of seats available. (${numberOfStudents} ≠ ${numberOfAvailableSeats})<br>Please check <span class="font-monospace">member_list.csv</span> and <span class="font-monospace">seat_position_matrix.csv</span>`;
+    document.getElementById('errorMessage').classList.remove('d-none');
+    renderSeatingChartV2(configDb.SEAT_POSITION_MATRIX); // 現状のレイアウトは表示
+    return;
+  }
+  temporalState.shuffledStudents = secureShuffle(configDb.MEMBER_LIST);
+  // 利用可能な座席にシャッフルされた生徒を割り当てる
+  // (描画関数内で割り当てを行う)
+  renderSeatingChartV2(configDb.SEAT_POSITION_MATRIX, temporalState.shuffledStudents);
+  temporalState.shuffledStudents = null;
+}
+
+async function performShuffleV3() {
+  const topStatusMessageSpan = [...document.querySelectorAll('#topStatusMessage p span')];
+
+  topStatusMessageSpan.forEach((el) => (el.textContent = '\u00A0'));
+
+  ['shuffleStepButton', 'shuffleButton', 'resetAllSeatButton', 'exportImageButton', 'exportJsonButton'].forEach(
+    (el) => (document.getElementById(el).disabled = true),
+  );
+
+  document.getElementById('errorMessage').classList.add('d-none'); // エラーメッセージを隠す
+  const numberOfStudents = configDb.MEMBER_LIST.length;
+  const numberOfAvailableSeats = countAvailableSeats(configDb.SEAT_POSITION_MATRIX);
+  if (numberOfStudents !== numberOfAvailableSeats) {
+    document.getElementById(
+      'errorMessage',
+    ).innerHTML = `Error: The number of students does not match the number of seats available. (${numberOfStudents} ≠ ${numberOfAvailableSeats})<br>Please check <span class="font-monospace">member_list.csv</span> and <span class="font-monospace">seat_position_matrix.csv</span>`;
+    document.getElementById('errorMessage').classList.remove('d-none');
+    renderSeatingChartV2(configDb.SEAT_POSITION_MATRIX); // 現状のレイアウトは表示
+    return;
+  }
+
+  const seatingChartDiv = document.getElementById('seatingChartHandmade');
+  if (temporalState.currentMemberIndex === 0) {
+    renderSeatingChartV2(configDb.SEAT_POSITION_MATRIX);
+  }
+
+  topStatusMessageSpan[0].textContent = `${configDb.MEMBER_LIST[temporalState.currentMemberIndex].id} - ${configDb.MEMBER_LIST[temporalState.currentMemberIndex].name
+    }`;
+
+  const remainingSeatCoordinates = [...seatingChartDiv.querySelectorAll('div[data-seat-assigned="false"]')].map(
+    (el) => ({ row: el.dataset.seatRow, col: el.dataset.seatCol }),
+  );
+
+  const pickRandomSeatCoord = () => {
+    const randomBytes = new Uint32Array(1);
+    const getRandomIndex = (arrayLength) => {
+      window.crypto.getRandomValues(randomBytes);
+      return Math.floor((randomBytes[0] / 0x100000000) * arrayLength);
+    };
+    return {
+      coord: remainingSeatCoordinates[getRandomIndex(remainingSeatCoordinates.length)],
+      randBuffer: randomBytes,
+    };
+  };
+
+  const updateSeatSpanContent = {
+    assign: (row, col, memberIndex) => {
+      const seatDiv = seatingChartDiv.querySelector(
+        `div[data-seat-row="${row}"][data-seat-col="${col}"][data-seat-assigned="false"]`,
+      );
+      const seatSpans = [...seatDiv.querySelectorAll('span')];
+      seatSpans[0].textContent = configDb.MEMBER_LIST[memberIndex].id;
+      seatSpans[1].textContent = configDb.MEMBER_LIST[memberIndex].name;
+      seatSpans[2].textContent = configDb.MEMBER_LIST[memberIndex].ruby;
+      seatDiv.dataset.seatAssigned = 'true';
+    },
+    clear: (row, col) => {
+      const seatDiv = seatingChartDiv.querySelector(`div[data-seat-row="${row}"][data-seat-col="${col}"]`);
+      const seatSpans = [...seatDiv.querySelectorAll('span')];
+      seatSpans.forEach((el) => (el.textContent = '\u00A0'));
+      seatDiv.dataset.seatAssigned = 'false';
+    },
+    cellBlink: async (row, col) => {
+      const seatDiv = seatingChartDiv.querySelector(`div[data-seat-row="${row}"][data-seat-col="${col}"]`);
+      seatDiv.classList.add('seat-cell-border-blink');
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+      seatDiv.classList.remove('seat-cell-border-blink');
+    },
+  };
+
+  document.querySelector('#shuffleStepButton span').innerHTML = '';
+  ['spinner-border', 'spinner-border-large', 'me-2'].forEach(name => document.querySelector('#shuffleStepButton span').classList.add(name));
+
+  let pickedRandomSeatCoord = pickRandomSeatCoord(); // init value
+
+  await (async () => {
+    const initialDelay = configDb.DEFAULT_SHUFFLE_CONFIG.initialDelay;
+    const maxDelay = configDb.DEFAULT_SHUFFLE_CONFIG.maxDelay;
+    const totalIterations = configDb.DEFAULT_SHUFFLE_CONFIG.totalIterations;
+    if (remainingSeatCoordinates.length === 1) {
+      updateSeatSpanContent.clear(pickedRandomSeatCoord.coord.row, pickedRandomSeatCoord.coord.col);
+      updateSeatSpanContent.assign(
+        pickedRandomSeatCoord.coord.row,
+        pickedRandomSeatCoord.coord.col,
+        temporalState.currentMemberIndex,
+      );
+    } else {
+      for (let i = 0; i < totalIterations; i++) {
+        const t = i / (totalIterations - 1);
+        const easedT = t * t * t; // easeInCubic
+        const delay = initialDelay + (maxDelay - initialDelay) * easedT;
+        // const delay = initialDelay + (i * (maxDelay - initialDelay)) / (totalIterations - 1);
+        topStatusMessageSpan[1].innerHTML = `Status: Processing ... (<span class="font-monospace">Iter: ${String(
+          i,
+        ).padStart(String(totalIterations).length, '\u00A0')}/${String(totalIterations).padStart(
+          String(totalIterations).length,
+          ' ',
+        )}, Wait: ${String(Math.round(delay)).padStart(String(maxDelay).length, '\u00A0')}ms, Rand: ${Array.from(
+          pickedRandomSeatCoord.randBuffer,
+          (n) => '0x' + ('00000000' + n.toString(16).toUpperCase()).slice(-8),
+        ).join(', ')}</span>)`;
+        await new Promise((resolve) => setTimeout(resolve, Math.round(delay)));
+        updateSeatSpanContent.clear(pickedRandomSeatCoord.coord.row, pickedRandomSeatCoord.coord.col);
+        pickedRandomSeatCoord = pickRandomSeatCoord();
+        updateSeatSpanContent.assign(
+          pickedRandomSeatCoord.coord.row,
+          pickedRandomSeatCoord.coord.col,
+          temporalState.currentMemberIndex,
+        );
+      }
+    }
+  })();
+
+  topStatusMessageSpan[1].innerHTML = 'Status: Completed';
+
+  document.querySelector('#shuffleStepButton span').innerHTML = '<i class="bi me-2 bi-shuffle"></i>';
+  ['spinner-border', 'spinner-border-large', 'me-2'].forEach(name => document.querySelector('#shuffleStepButton span').classList.remove(name));
+
+  temporalState.currentMemberIndex++;
+  if (temporalState.currentMemberIndex === numberOfStudents) {
+    temporalState.currentMemberIndex = 0;
+    document.getElementById('shuffleStepButton').disabled = true;
+    document.getElementById('shuffleButton').disabled = false;
+  } else {
+    document.getElementById('shuffleButton').disabled = true;
+    document.getElementById('shuffleStepButton').disabled = false;
+  }
+  ['exportImageButton', 'exportJsonButton', 'resetAllSeatButton'].forEach(
+    (el) => (document.getElementById(el).disabled = false),
+  );
+
+  updateSeatSpanContent.cellBlink(pickedRandomSeatCoord.coord.row, pickedRandomSeatCoord.coord.col);
+
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+
+  if (temporalState.currentMemberIndex > 0) {
+    topStatusMessageSpan[0].textContent = `${configDb.MEMBER_LIST[temporalState.currentMemberIndex].id} - ${configDb.MEMBER_LIST[temporalState.currentMemberIndex].name}`;
+    topStatusMessageSpan[1].textContent = 'Status: Waiting for user ...';
+  }
+}
+
+function exportAsImage() {
+  const originalTheme = document.documentElement.getAttribute('data-bs-theme');
+
+  document.querySelector('#exportImageButton span').innerHTML = '';
+  document.querySelector('#exportImageButton span').classList.add('spinner-border');
+  document.querySelector('#exportImageButton span').classList.add('me-2');
+
+  // スタイルを一時的に変更
+  if (originalTheme === 'dark') document.documentElement.setAttribute('data-bs-theme', 'light');
+
+  // DOM再描画を待つ
+  requestAnimationFrame(() => {
+    // ビューポート全体をキャプチャ
+    const seatingChartElement = document.getElementById('seatingChartHandmade');
+    html2canvas(seatingChartElement, {
+      scrollX: -window.scrollX,
+      scrollY: -window.scrollY,
+      windowWidth: seatingChartElement.scrollWidth,
+      windowHeight: seatingChartElement.scrollHeight,
+      scale: 3,
+    })
+      .then((canvas) => {
+        const link = document.createElement('a');
+        link.download = 'seating-chart.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      })
+      .finally(() => {
+        // 元のスタイルに戻す
+        if (originalTheme === 'dark') document.documentElement.setAttribute('data-bs-theme', originalTheme);
+        document.querySelector('#exportImageButton span').innerHTML = '<i class="bi me-2 bi-image"></i>';
+        document.querySelector('#exportImageButton span').classList.remove('spinner-border');
+        document.querySelector('#exportImageButton span').classList.remove('me-2');
+      });
+  });
+}
+// 画像エクスポートボタンのイベントリスナー
+document.getElementById('exportImageButton').addEventListener('click', function () {
+  exportAsImage();
+});
+
+document.getElementById('resetAllSeatButton').addEventListener('click', () => {
+  renderSeatingChartV2(configDb.SEAT_POSITION_MATRIX);
+  temporalState.currentMemberIndex = 0;
+  document.getElementById('shuffleStepButton').disabled = false;
+  document.getElementById('shuffleButton').disabled = false;
+  [...document.querySelectorAll('#topStatusMessage p span')].forEach((el) => (el.textContent = '\u00A0'));
+});
+
+document.getElementById('shuffleStepButton').addEventListener('click', async () => {
+  await performShuffleV3();
+});
+
+document.getElementById('shuffleButton').addEventListener('click', performShuffle);
+
+// 初期表示 (席替え実行前)
+document.addEventListener('DOMContentLoaded', async () => {
+  configDb = await configDbFunc.loadDb();
+  window.configDb = configDb;
+  renderSeatingChartV2(configDb.SEAT_POSITION_MATRIX); // まず座席レイアウトだけ表示
+  document.querySelector('#DEBUG_configDbDiv pre code').textContent = YAML.stringify(configDb);
+});

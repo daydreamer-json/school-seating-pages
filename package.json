@@ -1,0 +1,16 @@
+{
+  "name": "school-seating-pages",
+  "module": "src/main.ts",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "hono": "^4.7.10",
+    "open": "^10.1.2"
+  }
+}
