@@ -20,16 +20,16 @@ let temporalState = {
 };
 
 /**
- * 配列をセキュアな乱数を使ってシャッフルする (Fisher-Yates algorithm)
- * @param array シャッフルする配列
- * @returns シャッフルされた新しい配列
+ * Shuffle an array using secure random numbers (Fisher-Yates algorithm)
+ * @param array Arrays to shuffle
+ * @returns New shuffled array
  */
 function secureShuffle(array) {
   const newArray = [...array];
   const randomValues = new Uint32Array(newArray.length);
   window.crypto.getRandomValues(randomValues);
   for (let i = newArray.length - 1; i > 0; i--) {
-    // 0 から i までの範囲の乱数を生成
+    // Generate random number in the range from 0 to i
     const j = randomValues[i] % (i + 1);
     [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
   }
@@ -37,9 +37,9 @@ function secureShuffle(array) {
 }
 
 /**
- * 利用可能な座席数を計算する
- * @param layout 座席のレイアウト
- * @returns 利用可能な座席数
+ * Calculate the number of available seats
+ * @param layout Seat layout
+ * @returns Number of available seats
  */
 function countAvailableSeats(layout) {
   let count = 0;
@@ -54,15 +54,15 @@ function countAvailableSeats(layout) {
 }
 
 /**
- * 座席表を描画する
- * @param currentSeatLayout 割り当て前の座席レイアウト (表示用)
- * @param assignedStudents 割り当てられた生徒の情報 (オプショナル)
+ * Render seating chart
+ * @param currentSeatLayout Seating layout before assignment (for display purposes)
+ * @param assignedStudents Assigned student info (optional)
  */
 function renderSeatingChartV2(currentSeatLayout, assignedStudents) {
   // console.log(currentSeatLayout);
   // console.log(assignedStudents);
   const seatingChartDiv = document.getElementById('seatingChartHandmade');
-  seatingChartDiv.innerHTML = ''; // 既存の座席表をクリア
+  seatingChartDiv.innerHTML = ''; // Clear existing seating chart
   seatingChartDiv.insertAdjacentHTML(
     'beforeend',
     (() => {
@@ -118,14 +118,14 @@ function renderSeatingChartV2(currentSeatLayout, assignedStudents) {
 }
 
 /**
- * メインの席替え処理
+ * Main seat shuffle processing
  */
 function performShuffle() {
   const topStatusMessageSpan = [...document.querySelectorAll('#topStatusMessage p span')];
 
   topStatusMessageSpan.forEach((el) => (el.textContent = '\u00A0'));
 
-  document.getElementById('errorMessage').classList.add('d-none'); // エラーメッセージを隠す
+  document.getElementById('errorMessage').classList.add('d-none'); // Hide error messages
   const numberOfStudents = configDb.MEMBER_LIST.length;
   const numberOfAvailableSeats = countAvailableSeats(configDb.SEAT_POSITION_MATRIX);
   if (numberOfStudents !== numberOfAvailableSeats) {
@@ -133,12 +133,12 @@ function performShuffle() {
       'errorMessage',
     ).innerHTML = `Error: The number of students does not match the number of seats available. (${numberOfStudents} ≠ ${numberOfAvailableSeats})<br>Please check <span class="font-monospace">member_list.csv</span> and <span class="font-monospace">seat_position_matrix.csv</span>`;
     document.getElementById('errorMessage').classList.remove('d-none');
-    renderSeatingChartV2(configDb.SEAT_POSITION_MATRIX); // 現状のレイアウトは表示
+    renderSeatingChartV2(configDb.SEAT_POSITION_MATRIX); // Display current layout (not assigned)
     return;
   }
   temporalState.shuffledStudents = secureShuffle(configDb.MEMBER_LIST);
-  // 利用可能な座席にシャッフルされた生徒を割り当てる
-  // (描画関数内で割り当てを行う)
+  // Assign shuffled students to available seats
+  // (Assignments are made within the drawing function)
   renderSeatingChartV2(configDb.SEAT_POSITION_MATRIX, temporalState.shuffledStudents);
   temporalState.shuffledStudents = null;
 }
@@ -152,7 +152,7 @@ async function performShuffleV3() {
     (el) => (document.getElementById(el).disabled = true),
   );
 
-  document.getElementById('errorMessage').classList.add('d-none'); // エラーメッセージを隠す
+  document.getElementById('errorMessage').classList.add('d-none'); // Hide error messages
   const numberOfStudents = configDb.MEMBER_LIST.length;
   const numberOfAvailableSeats = countAvailableSeats(configDb.SEAT_POSITION_MATRIX);
   if (numberOfStudents !== numberOfAvailableSeats) {
@@ -160,7 +160,7 @@ async function performShuffleV3() {
       'errorMessage',
     ).innerHTML = `Error: The number of students does not match the number of seats available. (${numberOfStudents} ≠ ${numberOfAvailableSeats})<br>Please check <span class="font-monospace">member_list.csv</span> and <span class="font-monospace">seat_position_matrix.csv</span>`;
     document.getElementById('errorMessage').classList.remove('d-none');
-    renderSeatingChartV2(configDb.SEAT_POSITION_MATRIX); // 現状のレイアウトは表示
+    renderSeatingChartV2(configDb.SEAT_POSITION_MATRIX); // Display current layout (not assigned)
     return;
   }
 
@@ -213,8 +213,7 @@ async function performShuffleV3() {
     },
   };
 
-  document.querySelector('#shuffleStepButton span').innerHTML = '';
-  ['spinner-border', 'spinner-border-large', 'me-2'].forEach(name => document.querySelector('#shuffleStepButton span').classList.add(name));
+  document.getElementById('shuffleStepButton').innerHTML = '<span class="spinner-border spinner-border-large me-2"></span>';
 
   let pickedRandomSeatCoord = pickRandomSeatCoord(); // init value
 
@@ -258,8 +257,7 @@ async function performShuffleV3() {
 
   topStatusMessageSpan[1].innerHTML = 'Status: Completed';
 
-  document.querySelector('#shuffleStepButton span').innerHTML = '<i class="bi me-2 bi-shuffle"></i>';
-  ['spinner-border', 'spinner-border-large', 'me-2'].forEach(name => document.querySelector('#shuffleStepButton span').classList.remove(name));
+  document.getElementById('shuffleStepButton').innerHTML = '<span><i class="bi me-2 bi-shuffle"></i></span>Step';
 
   temporalState.currentMemberIndex++;
   if (temporalState.currentMemberIndex === numberOfStudents) {
@@ -291,12 +289,12 @@ function exportAsImage() {
   document.querySelector('#exportImageButton span').classList.add('spinner-border');
   document.querySelector('#exportImageButton span').classList.add('me-2');
 
-  // スタイルを一時的に変更
+  // Change style temporarily
   if (originalTheme === 'dark') document.documentElement.setAttribute('data-bs-theme', 'light');
 
-  // DOM再描画を待つ
+  // Wait for DOM redraw
   requestAnimationFrame(() => {
-    // ビューポート全体をキャプチャ
+    // Capture the entire viewport
     const seatingChartElement = document.getElementById('seatingChartHandmade');
     html2canvas(seatingChartElement, {
       scrollX: -window.scrollX,
@@ -312,7 +310,7 @@ function exportAsImage() {
         link.click();
       })
       .finally(() => {
-        // 元のスタイルに戻す
+        // Restore original style
         if (originalTheme === 'dark') document.documentElement.setAttribute('data-bs-theme', originalTheme);
         document.querySelector('#exportImageButton span').innerHTML = '<i class="bi me-2 bi-image"></i>';
         document.querySelector('#exportImageButton span').classList.remove('spinner-border');
@@ -320,7 +318,7 @@ function exportAsImage() {
       });
   });
 }
-// 画像エクスポートボタンのイベントリスナー
+
 document.getElementById('exportImageButton').addEventListener('click', function () {
   exportAsImage();
 });
@@ -339,10 +337,12 @@ document.getElementById('shuffleStepButton').addEventListener('click', async () 
 
 document.getElementById('shuffleButton').addEventListener('click', performShuffle);
 
-// 初期表示 (席替え実行前)
 document.addEventListener('DOMContentLoaded', async () => {
   configDb = await configDbFunc.loadDb();
   window.configDb = configDb;
-  renderSeatingChartV2(configDb.SEAT_POSITION_MATRIX); // まず座席レイアウトだけ表示
+  renderSeatingChartV2(configDb.SEAT_POSITION_MATRIX); // Display current layout (not assigned)
   document.querySelector('#DEBUG_configDbDiv pre code').textContent = YAML.stringify(configDb);
+  ['shuffleStepButton', 'shuffleButton', 'resetAllSeatButton'].forEach(
+    (el) => (document.getElementById(el).disabled = false),
+  );
 });
