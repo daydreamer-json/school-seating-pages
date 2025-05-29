@@ -75,6 +75,7 @@ function renderSeatingChartV2(currentSeatLayout, assignedStudents) {
         });
       });
       const retHtmlStrArray = [];
+      const seatCellWidth = Math.floor(12 / configDb.SEAT_POSITION_MATRIX[0].length);
       currentSeatLayout.forEach((rowArray, rowIndex) => {
         if (rowArray.includes(1)) {
           retHtmlStrArray.push(
@@ -90,16 +91,16 @@ function renderSeatingChartV2(currentSeatLayout, assignedStudents) {
                     if (currentSeatOrderIndex !== -1 && currentSeatOrderIndex < assignedStudents.length) {
                       const student = assignedStudents[currentSeatOrderIndex];
                       retHtmlStrArray2.push(
-                        `<div class="col-2 px-1"><div class="d-flex flex-column seat-cell-border" data-seat-row="${currentSeatCoord.row}" data-seat-col="${currentSeatCoord.col}" data-seat-assigned="true"><span>${student.id}</span><span class="fs-5 fw-bold">${student.name}</span><span class="text-secondary">${student.ruby}</span></div></div>`,
+                        `<div class="col-${seatCellWidth} px-1"><div class="d-flex flex-column seat-cell-border" data-seat-row="${currentSeatCoord.row}" data-seat-col="${currentSeatCoord.col}" data-seat-assigned="true"><span>${student.id}</span><span class="fs-5 fw-bold">${student.name}</span><span class="text-secondary">${student.ruby}</span></div></div>`,
                       );
                     }
                   } else {
                     retHtmlStrArray2.push(
-                      `<div class="col-2 px-1"><div class="d-flex flex-column seat-cell-border" data-seat-row="${currentSeatCoord.row}" data-seat-col="${currentSeatCoord.col}" data-seat-assigned="false"><span>&nbsp;</span><span class="fs-5 fw-bold">&nbsp;</span><span class="text-secondary">&nbsp;</span></div></div>`,
+                      `<div class="col-${seatCellWidth} px-1"><div class="d-flex flex-column seat-cell-border" data-seat-row="${currentSeatCoord.row}" data-seat-col="${currentSeatCoord.col}" data-seat-assigned="false"><span>&nbsp;</span><span class="fs-5 fw-bold">&nbsp;</span><span class="text-secondary">&nbsp;</span></div></div>`,
                     );
                   }
                 } else {
-                  retHtmlStrArray2.push(`<div class="col-2 px-1"></div>`);
+                  retHtmlStrArray2.push(`<div class="col-${seatCellWidth} px-1"></div>`);
                 }
               });
               return retHtmlStrArray2.join('');
@@ -108,7 +109,7 @@ function renderSeatingChartV2(currentSeatLayout, assignedStudents) {
         }
       });
       retHtmlStrArray.push(
-        `<div class="row py-1"><div class="col-4 px-1"></div><div class="col-4 px-1"><div class="d-flex flex-column seat-cell-border"><span class="fs-5 fw-bold">${configDb.CLASS_NUMBER.grade}${configDb.CLASS_I18N.grade}${configDb.CLASS_NUMBER.class}${configDb.CLASS_I18N.class}</span></div></div><div class="col-4 px-1"></div></div>`,
+        `<div class="row py-1"><div class="col-${Math.floor((seatCellWidth * configDb.SEAT_POSITION_MATRIX[0].length) / 3)} px-1"></div><div class="col-${Math.floor((seatCellWidth * configDb.SEAT_POSITION_MATRIX[0].length) / 3)} px-1"><div class="d-flex flex-column seat-cell-border"><span class="fs-5 fw-bold">${configDb.CLASS_NUMBER.grade}${configDb.CLASS_I18N.grade}${configDb.CLASS_NUMBER.class}${configDb.CLASS_I18N.class}</span></div></div><div class="col-${Math.floor((seatCellWidth * configDb.SEAT_POSITION_MATRIX[0].length) / 3)} px-1"></div></div>`,
       );
       return retHtmlStrArray.join('');
     })(),
