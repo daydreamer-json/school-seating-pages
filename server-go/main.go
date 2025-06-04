@@ -17,6 +17,9 @@ import (
 )
 
 func main() {
+    fmt.Printf("=====================================\n")
+    fmt.Printf("School Seating Pages (Backend Server)\n")
+    fmt.Printf("=====================================\n\n")
     mux := http.NewServeMux()
     mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
         requestPath := r.URL.Path
@@ -55,7 +58,7 @@ func main() {
     defer ln.Close()
 
     port := ln.Addr().(*net.TCPAddr).Port
-    fmt.Printf("HTTP server running at http://localhost:%d\n", port)
+    fmt.Printf("HTTP server running at http://localhost:%d\n\n", port)
 
     server := &http.Server{Handler: mux}
 
